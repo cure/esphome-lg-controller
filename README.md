@@ -8,7 +8,6 @@ This has some advantages compared to the [LG ThinQ integration](https://github.c
 * No annoying sounds from the AC unit when changing settings through the controller.
 * More settings and information available (although some settings like display light on/off are available in ThinQ but aren't passed to the wired controller).
 
-<img src="hardware-tiny/pcb.jpg" width="400px" alt="Tiny PCB"> <img src="images/controller2.jpg" width="255px" alt="PCB in enclosure">
 <img src="images/controller4.png" width="660px" alt="Screenshot of Home Assistant dashboard">
 
 # Compatibility
@@ -35,6 +34,67 @@ Wired controllers using the new protocol only send and receive settings and curr
 
 See [protocol.md](protocol.md) for information about the protocol based on reverse engineering the PREMTB001 and PREMTB100 controllers.
 
+# Hardware
+There are three different PCB designs. The "hardware-tiny" variant is most popular at this point. The "hardware-FeatherS3" PCB is a more recent addition.
+
+## "hardware" (original, June 2023)
+<img src="images/controller2.jpg" width="255px" alt="PCB in enclosure">
+
+You need at least the following parts for each indoor unit:
+* PCB. See the original PCB in the [hardware/](hardware/) directory
+* ESP32 DevKitC board. I used an Espressif ESP32-DevKitC-32E.
+* Cable with JST-XH connector to connect the PCB to the AC. I used an Adafruit 4873 cable.
+
+The `hardware/` PCB I ordered from [PCBWay](https://www.pcbway.com/QuickOrderOnline.aspx).
+
+## "hardware-tiny" (November 2023)
+<img src="hardware-tiny/pcb.jpg" width="400px" alt="Tiny PCB">
+
+You need at least the following parts for each indoor unit:
+* PCB. See the cheaper and smaller PCB in the [hardware-tiny/](hardware-tiny/) directory.
+* ESP32 DevKitC board. I used an Espressif ESP32-DevKitC-32E.
+* Cable with JST-XH connector to connect the PCB to the AC. I used an Adafruit 4873 cable.
+
+The `hardware-tiny/` PCB can be ordered from [JLCPCB](https://cart.jlcpcb.com/quote/) (see instructions [here](https://github.com/JanM321/esphome-lg-controller/issues/2#issuecomment-1801803656)).
+
+## "hardware-FeatherS3" (May 2025)
+
+<img src="hardware-FeatherS3/pcb-with-FeatherS3.jpg" width="400px" alt="PCB with FeatherS3">
+<img src="hardware-FeatherS3/pcb-top-and-bottom.jpg" width="400px" alt="PCB top and bottom">
+
+You need at least the following parts for each indoor unit:
+* PCB. See the even smaller PCB in the [hardware-FeatherS3/](hardware-FeatherS3/) directory.
+* Unexpected Maker's [ESP32 FeatherS3](https://esp32s3.com/feathers3.html)
+* Cable with JST-XH connector to connect the PCB to the AC. I used an Adafruit 4873 cable.
+
+This PCB supports the more modern [FeatherS3 by Unexpected Maker](https://esp32s3.com/feathers3.html), which has a USB-C connector. The FeatherS3 [can be powered from the 3.3V pin](https://help.unexpectedmaker.com/index.php/knowledge-base/can-i-power-my-board-from-the-3v3-pin/), which is what is assumed here. The USB-C connector should not be connected at the same time; if you want to power the FeatherS3 via USB, you should not connect the 3.3V pin.
+
+The `hardware-FeatherS3/` PCB can be ordered from [JLCPCB](https://cart.jlcpcb.com/quote/).
+
+JLCPCB ordering instructions:
+
+* Upload [`GERBER-lg_hvac_esp32.zip`](hardware-FeatherS3/jlcpcb/production_files/GERBER-lg_hvac_esp32.zip) as the gerber file, leave all settings default.
+* Enable the `Assembly` option at the bottom of the quote page and proceed.
+* Upload [`BOM-lg_hvac_esp32.csv`](hardware-FeatherS3/jlcpcb/production_files/BOM-lg_hvac_esp32.csv) for the bom file and [`CPL-lg_hvac_esp32.csv`](hardware-FeatherS3/jlcpcb/production_files/CPL-lg_hvac_esp32.csv) for placement / cpl
+
+I paid about $50 for five boards, fully assembled, before any shipping and import duties.
+
+*Note: if you use the FeatherS3 PCB, you'll also need to make some changes to `esphome/base.yaml` for ESPHome as part of the next step. See the FeatherS3 comments in that file.*
+
+# ESPHome Firmware
+I used the following steps to build the ESPHome firmware, flash it on the device, and add the controller in Home Assistant:
+1. Clone this repository and navigate to the `esphome` directory.
+2. Install ESPHome command line tools on Linux: https://esphome.io/guides/installing_esphome.html
+3. Ensure the Python virtual environment is activated (`source venv/bin/activate`).
+4. Copy `template.yaml` to (for example) `lg-livingroom.yaml` and edit the lines marked with `XXX`.
+5. Connect the ESP32 DevKitC board to your computer with a micro USB cable. This is only needed the first time, after that it can use OTA updates over wifi.
+6. Run `esphome run lg-livingroom.yaml` to build the firmware and upload it to the device.
+7. The device can now be added in Home Assistant (Settings => Devices & Services). HA will ask you for the encryption key from the YAML file.
+8. Disconnect the micro USB cable.
+9. Install the ESP32 DevKitC board on the PCB and connect the PCB to the AC.
+
+If you just want to connect to the device to view the debug logs, use `esphome logs lg-livingroom.yaml`.
+
 # Features
 Features currently available in Home Assistant:
 * Operation mode (off, auto, cool, heat, dry/dehumidify, fan only).
@@ -58,15 +118,11 @@ The LG ThinQ app and wireless remote can still be used to change these settings 
 
 Unfortunately not all settings are exposed to the wired controller, but if you're interested in a feature and it's supported by the PREMTB100 or PREMTA200 controller, please open an issue and we can consider adding it.
 
-# Hardware
-You need at least the following parts for each indoor unit:
-* PCB. Either my original PCB in the [hardware/](hardware/) directory or the cheaper and smaller PCB in the [hardware-tiny/](hardware-tiny/) directory.
-* ESP32 DevKitC board. I used an Espressif ESP32-DevKitC-32E.
-* Cable with JST-XH connector to connect the PCB to the AC. I used an Adafruit 4873 cable.
+# Tips
+* [Issue #43](https://github.com/JanM321/esphome-lg-controller/issues/43) has some information on temperature sensors that work well for this.
+* It's possible to use a Home Assistant template sensor as room temperature sensor. I'm [using this](https://gist.github.com/JanM321/b550285713f20231386509b2c227f0b8) to work around some issues with my LG Multi F unit in heating mode.
 
-The `hardware-tiny/` PCB can be ordered from [JLCPCB](https://cart.jlcpcb.com/quote/) (see instructions [here](https://github.com/JanM321/esphome-lg-controller/issues/2#issuecomment-1801803656)). The `hardware/` PCB I ordered from [PCBWay](https://www.pcbway.com/QuickOrderOnline.aspx).
-
-## PCB (details)
+# PCB (details)
 ***❗ Update November 2023: This section is for my original PCB in the hardware/ directory. [Florian Brede](https://github.com/florianbrede-ayet) has designed a smaller and cheaper PCB that can be ordered from JLCPCB. It's in the [hardware-tiny/](hardware-tiny/) directory.***
 
 <img src="hardware/schematic.png" width="700px">
@@ -87,24 +143,6 @@ My PCB also has some capacitors, resistors and diodes that are based on the TLIN
 Note: an alternative for the LIN transceiver is the opto-isolator design used here:
 * https://github.com/AussieMakerGeek/LG_Aircon_MQTT_interface
 * https://www.instructables.com/Hacking-an-LG-Ducted-Split-for-Home-Automation/
-
-# Firmware
-I used the following steps to build the ESPHome firmware, flash it on the device, and add the controller in Home Assistant:
-1. Clone this repository and navigate to the `esphome` directory.
-2. Install ESPHome command line tools on Linux: https://esphome.io/guides/installing_esphome.html
-3. Ensure the Python virtual environment is activated (`source venv/bin/activate`).
-4. Copy `template.yaml` to (for example) `lg-livingroom.yaml` and edit the lines marked with `XXX`.
-5. Connect the ESP32 DevKitC board to your computer with a micro USB cable. This is only needed the first time, after that it can use OTA updates over wifi.
-6. Run `esphome run lg-livingroom.yaml` to build the firmware and upload it to the device.
-7. The device can now be added in Home Assistant (Settings => Devices & Services). HA will ask you for the encryption key from the YAML file.
-8. Disconnect the micro USB cable.
-9. Install the ESP32 DevKitC board on the PCB and connect the PCB to the AC.
-
-If you just want to connect to the device to view the debug logs, use `esphome logs lg-livingroom.yaml`.
-
-# Tips
-* [Issue #43](https://github.com/JanM321/esphome-lg-controller/issues/43) has some information on temperature sensors that work well for this.
-* It's possible to use a Home Assistant template sensor as room temperature sensor. I'm [using this](https://gist.github.com/JanM321/b550285713f20231386509b2c227f0b8) to work around some issues with my LG Multi F unit in heating mode.
 
 # License
 This project is licensed under the 0BSD License. See the LICENSE file for details.
